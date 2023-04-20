@@ -1,0 +1,268 @@
+ // Choose your pins
+// Enable pins are needed to control motor speed (through PWM)
+
+// Pins for motor 1 Left
+#define Pin1A 7 
+#define Pin2A 8
+#define ENA 3
+
+// pins for motor 2 Right
+#define Pin3A 9
+#define Pin4A 10
+#define ENB 11
+
+// pins for ultrasonic sensor
+#define TRIGGER 5
+#define ECHO 6
+
+// pins for the two reflectance sensors
+#define QTR_L A3
+#define QTR_R A0
+
+//Speeds
+#define MAX_SPEED = 255
+#define HALF_SPEED = 127
+#define QUARTER_SPEED = 63
+
+//global variables
+float distance = 0;
+int lightRight = 0;
+int lightLeft = 0;
+unsigned long startTime, currentTime = 0;
+
+
+  
+
+
+
+void setup() {
+  // put your setup code here, to run once:
+ 
+
+// put your setup code here, to run once:
+  Serial.begin(9600);
+
+  // Set up your 6 motor-related pins(control)
+  pinMode(Pin1A, OUTPUT);   pinMode(Pin3A, OUTPUT);
+  pinMode(Pin2A, OUTPUT);   pinMode(Pin4A, OUTPUT);
+  pinMode(ENA, OUTPUT);     pinMode(ENB, OUTPUT);
+
+  // Set up your sensor pins
+  pinMode(TRIGGER, OUTPUT);
+  pinMode(ECHO, INPUT);
+  pinMode(QTR_L, INPUT);
+  pinMode(QTR_R, INPUT);
+
+  delay(5000);
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+
+  
+  Detect();
+  
+  
+}
+
+
+void Update(){
+  Ultrasonic();
+  LightSensors();
+}
+
+void Detect(){
+  Update();
+  MotorSetup();
+  
+}
+
+void MotorSetup(){
+  //entire front is near border
+  //reverse straight
+  if(lightLeft < 650 && lightRight < 650){
+    MotorControl(0);
+  }
+  //front left is near border
+  else if(lightLeft < 650){
+    MotorControl(1);
+  }
+  //front right is near border
+  else if(lightRight < 650){
+    MotorControl(2);
+  }
+  //bot is in front close
+  //PUSH HARD
+  else if (distance > 0 && distance <= 23){
+    MotorControl(3);
+  }
+
+  //bot somewhat close move forward
+  else if (distance > 23 && distance < 45){
+    MotorControl(4);
+  }
+
+  //turn and look for bot
+  else if(distance >= 45){
+    MotorControl(5);
+  }
+}
+
+void MotorControl(int moveToDo){
+  switch(moveToDo){
+    case 0:
+      Reverse(MAX_SPEED);
+      delay(100);
+      break;
+    
+    case 1:
+      Reverse(MAX_SPEED, HALF_SPEED);
+      delay(75);
+      break;
+    
+    case 2:
+      Reverse(HALF_SPEED, MAX_SPEED);
+      delay(75);
+      break;
+      
+    case 3:
+        Serial.println("1");
+        StartTime();
+        Forward(MAX_SPEED);
+        currentTime = millis();
+        if(currentTime - startTime > 3500){
+          randomNumber = random(0,2);
+          if(randomNumber == 0){
+            SpinLeft();
+            delay(200);
+          }
+          else{
+            SpinRight();
+            delay(200);
+          }
+          StopTime();
+          
+        }
+      break;
+    
+    case 4:
+      Forward(QUARTER_SPEED);
+      delay(50);
+      break;
+    
+    case 5:
+      Stop();
+      Search();
+      break;
+  }
+  
+}
+
+void StartTime(){
+  if(startTime == 0 ){
+    startTime = millis();
+  }
+}
+
+void StopTime(){
+  startTime = 0;
+}
+
+void Search(){
+  randNumber = random(0,10);
+  if(randNumber > 5){
+     TurnRight(QUARTER_SPEED);
+    delay(50);  //give bot chance to turn
+  }
+  else{
+    TurnLeft(QUARTER_SPEED);
+    delay(50);
+  }
+ 
+  
+}
+
+void Stop(){
+  analogWrite(ENA, 0); // send PWM
+  analogWrite(ENB, 0);
+}
+
+void Forward(int spd){
+  digitalWrite(Pin1A, LOW);
+  digitalWrite(Pin2A, HIGH);
+  digitalWrite(Pin3A, LOW);
+  digitalWrite(Pin4A, HIGH);
+  analogWrite(ENA, spd); // send PWM
+  analogWrite(ENB, spd);
+}
+
+void Reverse(int left, int right){
+  digitalWrite(Pin1A, HIGH);
+  digitalWrite(Pin2A, LOW);
+  digitalWrite(Pin3A, HIGH);
+  digitalWrite(Pin4A, LOW);
+  analogWrite(ENA, left); // send PWM
+  analogWrite(ENB, right);
+}
+
+void Reverse(int spd){
+  digitalWrite(Pin1A, HIGH);
+  digitalWrite(Pin2A, LOW);
+  digitalWrite(Pin3A, HIGH);
+  digitalWrite(Pin4A, LOW);
+  analogWrite(ENA, spd); // send PWM
+  analogWrite(ENB, spd);
+}
+
+void TurnLeft(int spd){
+  digitalWrite(Pin1A, HIGH);
+  digitalWrite(Pin2A, LOW);
+  digitalWrite(Pin3A, LOW);
+  digitalWrite(Pin4A, HIGH);
+  analogWrite(ENA, spd); // send PWM
+  analogWrite(ENB, spd);
+}
+
+void TurnRight(int spd){
+  digitalWrite(Pin1A, LOW);
+  digitalWrite(Pin2A, HIGH);
+  digitalWrite(Pin3A, HIGH);
+  digitalWrite(Pin4A, LOW);
+  analogWrite(ENA, spd); // send PWM
+  analogWrite(ENB, spd);
+}
+
+//gets distance from ultrasonic front sensor
+void Ultrasonic(){
+  
+  digitalWrite(TRIGGER, LOW); 
+  delayMicroseconds(2);
+  digitalWrite(TRIGGER,HIGH);
+
+
+  delayMicroseconds(10);
+  digitalWrite(TRIGGER,LOW);
+
+  //calculate distance
+   distance = pulseIn(ECHO, HIGH, 30000);  // Change the sensor timeout to 35ms
+  distance = (int) (distance/68);   // experimenting with typecast int to eliminate float. maybe increase processing speed?
+  Serial.println(distance);
+  // Timeout handling
+  if (distance >=2000) distance = 0;
+}
+
+//calculates if any of the front side sensors see the border under
+void LightSensors(){
+  //calculate if front sides are over the border
+  //Left detects white around 500
+  //right detects white around 50
+  //Both detect black around 900
+  //Maybe set white threshold around 700? 
+  lightLeft = analogRead(QTR_L);
+  lightRight = analogRead(QTR_R);
+
+  
+  //Serial.println(lightLeft);
+  //Serial.println(lightRight);
+}
+
